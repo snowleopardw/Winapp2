@@ -1,7 +1,7 @@
 ﻿Option Strict On
 Module MenuMaker
 
-    'basic menu frames
+    'basic menu frames & strings
     Public menuStr00 As String = " ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗"
     Public menuStr01 As String = " ║                                                                                                                    ║"
     Public menuStr02 As String = " ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝"
@@ -9,6 +9,38 @@ Module MenuMaker
     Public menuStr04 As String = menu(menuStr01) & Environment.NewLine & mkMenuLine("Menu: Enter a number to select", "c") & Environment.NewLine & mkMenuLine(menuStr01, "")
     Public anyKeyStr As String = "Press any key to return to the winapp2ool menu."
     Public invInpStr As String = "Invalid input. Please try again."
+
+    'the maximum length of the portion of the first half of a '#. Option - Description' style menu line
+    Public menuItemLength As Integer
+
+    'indicates whether or not we are pending an exit from the menu
+    Public exitCode As Boolean
+
+    'Holds the output text at the top of the menu
+    Public menuTopper As String
+
+    'Initalize the menu 
+    Public Sub initMenu(topper As String, itemlen As Integer)
+        exitCode = False
+        menuTopper = topper
+        menuItemLength = itemlen
+    End Sub
+
+    'Print an empty menu line
+    Public Sub printBlankMenuLine()
+        printMenuLine(menuStr01)
+    End Sub
+
+    'Print the top of the menu containing the topper, any description text, the menu prompt, and the exit option
+    Public Sub printMenuTop(descriptionItems As String())
+        printMenuLine(tmenu(menuTopper))
+        printMenuLine(menuStr03)
+        For Each line In descriptionItems
+            printMenuLine(line, "c")
+        Next
+        printMenuLine(menuStr04)
+        printMenuOpt("0. Exit", "Return to the winapp2ool menu")
+    End Sub
 
     'constructs a menu string 
     Public Function menu(lineString As String) As String
@@ -30,17 +62,16 @@ Module MenuMaker
         cwl(menu(lineString, align))
     End Sub
 
-
-    Public Sub printMenuLine(lineString1 As String, lineString2 As String, endLength As Integer)
-        While lineString1.Length < endLength
+    'Prints a numbered menu option to a set length 
+    Public Sub printMenuOpt(lineString1 As String, lineString2 As String)
+        While lineString1.Length < menuItemLength
             lineString1 += " "
         End While
         cwl(menu(lineString1 & "- " & lineString2, "l"))
-
     End Sub
 
     'Flip the exitCode status so we can return to menu when desired
-    Public Sub revertMenu(ByRef exitCode As Boolean)
+    Public Sub revertMenu()
         exitCode = Not exitCode
     End Sub
 
@@ -110,6 +141,14 @@ Module MenuMaker
         End If
 
         Return dirStr
+    End Function
+
+    'Observe which preceding options in the menu are enabled and return the proper offset from a minumum menu number
+    Public Function getMenuNumber(valList As Boolean(), lowestStartingNum As Integer) As Integer
+        For Each setting In valList
+            If setting Then lowestStartingNum += 1
+        Next
+        Return lowestStartingNum
     End Function
 
 End Module

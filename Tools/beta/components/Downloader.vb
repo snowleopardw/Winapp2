@@ -13,30 +13,21 @@ Module Downloader
     'File handler
     Dim downloadFile As IFileHandlr = New IFileHandlr(Environment.CurrentDirectory & "\winapp2ool downloads", "")
 
-    'Menu settings
-    Dim exitCode As Boolean = False
-    Dim menuTopper As String = ""
-
     Private Sub printMenu()
-        printMenuLine(tmenu(menuTopper))
-        printMenuLine(menuStr03)
-        printMenuLine("Menu: Enter a number to select", "c")
-        printMenuLine(menuStr01)
-        printMenuLine("0. Exit                         - Return to the winapp2ool menu", "l")
-        printMenuLine("1. Winapp2.ini                  - Download the latest winapp2.ini", "l")
-        printMenuLine("2. Non-CCleaner                 - Download the latest non-ccleaner winapp2.ini", "l")
-        printMenuLine("3. Winapp2ool                   - Download the latest winapp2ool.exe", "l")
-        printMenuLine("4. Removed Entries.ini          - Download only entries used to create the non-ccleaner winapp2.ini", "l")
-        printMenuLine(menuStr01)
-        printMenuLine("5. Directory                    - Change the save directory", "l")
-        printMenuLine(menuStr01)
+        printMenuTop({"Download files from the winapp2 GitHub"})
+        printMenuOpt("1. Winapp2.ini", "Download the latest winapp2.ini")
+        printMenuOpt("2. Non-CCleaner", "Download the latest non-ccleaner winapp2.ini")
+        printMenuOpt("3. Winapp2ool", "Download the latest winapp2ool.exe")
+        printMenuOpt("4. Removed Entries.ini", "Download only entries used to create the non-ccleaner winapp2.ini")
+        printBlankMenuLine()
+        printMenuOpt("5. Directory", "Change the save directory")
+        printBlankMenuLine()
         printMenuLine("Save directory: " & replDir(downloadFile.dir), "l")
         printMenuLine(menuStr02)
     End Sub
 
     Public Sub main()
-        exitCode = False
-        menuTopper = "Download"
+        initMenu("Download", 35)
 
         Do Until exitCode
             Console.Clear()
@@ -57,12 +48,13 @@ Module Downloader
                 Case "4"
                     download("Removed entries.ini", removedLink, downloadFile.dir)
                 Case "5"
-                    dChooser(downloadFile.dir, exitCode)
+                    dChooser(downloadFile.dir)
                     menuTopper = "Changed save directory"
                 Case Else
                     menuTopper = invInpStr
             End Select
         Loop
+        revertMenu()
     End Sub
 
     'fetch winapp2.ini from github (ncc or otherwise)

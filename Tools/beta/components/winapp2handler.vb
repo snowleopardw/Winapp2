@@ -1,4 +1,5 @@
-﻿Module winapp2handler
+﻿Option Strict On
+Module winapp2handler
 
     Public Function replaceAndSort(ByRef ListToBeSorted As List(Of String), characterToReplace As String, ByVal replacementText As String) As List(Of String)
         'Take in a list of strings (key values) to be sorted, replace any characters that need replacing (also pad single digit numbers), sort the list, and restore the original state of those characters
@@ -120,7 +121,6 @@
     Public Class winapp2file
 
         Public entryList As List(Of String)
-        Public duplicateList
 
         Public cEntries As iniFile
         Public fxEntries As iniFile
@@ -156,7 +156,7 @@
             If file.comments.Count = 0 Then
                 version = "; version 000000"
             Else
-                version = IIf(Not file.comments.Values(0).comment.ToLower.Contains("version"), "; version 000000", file.comments.Values(0).comment)
+                version = If(Not file.comments.Values(0).comment.ToLower.Contains("version"), "; version 000000", file.comments.Values(0).comment)
             End If
 
             'record the full list of all the entry names
@@ -182,31 +182,31 @@
                         Case "3029"
                             If Not cEntries.sections.Keys.Contains(section.name) Then
                                 cEntries.sections.Add(section.name, section)
-                                cEntryLines.Add(section.startingLineNumber.ToString)
+                                cEntryLines.Add(section.startingLineNumber)
                                 cEntriesW.Add(tmpwa2entry)
                             End If
                         Case "3026"
                             If Not fxEntries.sections.Keys.Contains(section.name) Then
                                 fxEntries.sections.Add(section.name, section)
-                                fxEntryLines.Add(section.startingLineNumber.ToString)
+                                fxEntryLines.Add(section.startingLineNumber)
                                 fxEntriesW.Add(tmpwa2entry)
                             End If
                         Case "3030"
                             If Not tbEntries.sections.Keys.Contains(section.name) Then
                                 tbEntries.sections.Add(section.name, section)
-                                tbEntryLines.Add(section.startingLineNumber.ToString)
+                                tbEntryLines.Add(section.startingLineNumber)
                                 tbEntriesW.Add(tmpwa2entry)
                             End If
                         Case Else
                             If Not mEntries.sections.Keys.Contains(section.name) Then
                                 mEntries.sections.Add(section.name, section)
-                                mEntryLines.Add(section.startingLineNumber.ToString)
+                                mEntryLines.Add(section.startingLineNumber)
                                 mEntriesW.Add(tmpwa2entry)
                             End If
                     End Select
                 Else
                     mEntries.sections.Add(section.name, section)
-                    mEntryLines.Add(section.startingLineNumber.ToString)
+                    mEntryLines.Add(section.startingLineNumber)
                     mEntriesW.Add(tmpwa2entry)
                 End If
 
@@ -345,18 +345,36 @@
         Public paramString As String
         Public argsList As List(Of String)
         Public flagString As String
+        Public keyType As String
 
-        'This method will parameterize a filekey's arguments into a small object. 
+
+        'This method will parameterize a key's arguments into a small object. 
         Public Sub New(key As iniKey)
-            Dim splitKey As String() = key.value.Split(CChar("|"))
-            argsList = New List(Of String)
-            paramString = ""
-            flagString = ""
-            If splitKey.Count > 1 Then
-                paramString = splitKey(0)
-                argsList.AddRange(splitKey(1).Split(CChar(";")))
-                If splitKey.Count >= 3 Then flagString = splitKey(2)
-            End If
+            Select Case key.keyType
+                Case "FileKey"
+                    Dim splitKey As String() = key.value.Split(CChar("|"))
+                    argsList = New List(Of String)
+                    paramString = ""
+                    flagString = ""
+                    If splitKey.Count > 1 Then
+                        paramString = splitKey(0)
+                        argsList.AddRange(splitKey(1).Split(CChar(";")))
+                        If splitKey.Count >= 3 Then flagString = splitKey(2)
+                    End If
+
+                Case "ExcludeKey"
+                    Dim splitKey As String() = key.value.Split(CChar("|"))
+                    argsList = New List(Of String)
+                    paramString = ""
+                    flagString = ""
+                    If splitKey.Count = 3 Then
+                        paramString = splitKey(1)
+                        argsList.AddRange(splitKey(2).Split(CChar(";")))
+                        flagString = splitKey(0)
+                    End If
+            End Select
+
+
         End Sub
 
         Public Sub reconstructKey(ByRef key As iniKey)
@@ -373,6 +391,7 @@
             out += argsList.Last
             If Not flagString = "" Then out += "|" & flagString
             key.value = out
+
         End Sub
 
     End Class

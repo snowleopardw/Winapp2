@@ -8,15 +8,22 @@ Module WinappDebug
     Dim outputFile As IFileHandlr = New IFileHandlr(Environment.CurrentDirectory, "winapp2.ini", "winapp2-debugged.ini")
 
     'Menu settings
-    Dim exitCode As Boolean = False
-    Dim menuItemLength As Integer = 35
-    Dim menuTopper As String = ""
     Dim settingsChanged As Boolean = False
 
     'Module parameters
     Dim correctFormatting As Boolean = False
     Dim allEntryNames As New List(Of String)
     Dim numErrs As Integer = 0
+    Dim correctSomeFormatting As Boolean = True
+
+    'Autocorrect Parameters
+    Dim correctCasing As Boolean = True
+    Dim correctAlpha As Boolean = True
+    Dim correctNumbers As Boolean = True
+    Dim correctParameters As Boolean = True
+    Dim correctFlags As Boolean = True
+    Dim correctSlashes As Boolean = True
+    Dim correctDefaults As Boolean = True
 
     'Winapp2 Parameters
     Dim enVars As String() = {"UserProfile", "ProgramFiles", "RootDir", "WinDir", "AppData", "SystemDrive", "SystemRoot", "Documents", "ProgramData", "AllUsersProfile", "Pictures", "Video", "CommonAppData", "LocalAppData", "CommonProgramFiles", "HomeDrive", "Music", "tmp", "Temp", "LocalLowAppData", "Public"}
@@ -40,6 +47,7 @@ Module WinappDebug
         correctFormatting = False
     End Sub
 
+    'Handle the input from the command line
     Public Sub remoteDebug(ByRef firstFile As IFileHandlr, secondFile As IFileHandlr, cformatting As Boolean)
         winappFile = firstFile
         outputFile = secondFile
@@ -47,38 +55,38 @@ Module WinappDebug
         initDebug()
     End Sub
 
+    'Restore the settings and alert the user
     Private Sub resetSettings()
         initDefaultSettings()
         menuTopper = "WinappDebug settings have been reset to their defaults"
     End Sub
 
+    'Present the menu to the user
     Private Sub printMenu()
-        printMenuLine(tmenu(menuTopper))
-        printMenuLine(menuStr03)
-        printMenuLine("This tool will check winapp2.ini For common syntax And style errors.", "c")
-        printMenuLine(menuStr01)
-        printMenuLine(menuStr04)
-        printMenuLine("0. Exit", "Return to the winapp2ool menu", menuItemLength)
-        printMenuLine("1. Run (default)", "Run the debugger", menuItemLength)
-        printMenuLine(menuStr01)
-        printMenuLine("2. Toggle Autocorrect", If(correctFormatting, "Disable", "Enable") & " saving of corrected errors", menuItemLength)
-        printMenuLine(menuStr01)
-        printMenuLine("3. File Chooser (winapp2.ini)", "Choose a new winapp2.ini name or location", menuItemLength)
-        If correctFormatting Then printMenuLine("4. File Chooser (save)", "Choose a new save name or location", menuItemLength)
+        printMenuTop({"Scan winapp2.ini for syntax and style errors, and attempt to repair them."})
+        printMenuOpt("1. Run (default)", "Run the debugger")
+        printBlankMenuLine()
+        printMenuOpt("2. File Chooser (winapp2.ini)", "Choose a new winapp2.ini name or location")
 
-        printMenuLine(menuStr01)
+        printBlankMenuLine()
+        printMenuOpt("3. Toggle Autocorrect", If(correctFormatting, "Disable", "Enable") & " saving of corrected errors")
+        If correctFormatting Then printMenuOpt("4. File Chooser (save)", "Choose a new save name or location")
+
+        printBlankMenuLine()
+        printMenuOpt(getMenuNumber({correctFormatting}, 4) & ". Toggle scan/repair settings", "Enable or disable individual scan routines and auto corrections")
+
+        printBlankMenuLine()
         printMenuLine("Current winapp2.ini:  " & replDir(winappFile.path), "l")
         If correctFormatting Then printMenuLine("Current save target:  " & replDir(outputFile.path), "l")
         If settingsChanged Then
-            printMenuLine(menuStr01)
-            printMenuLine(getMenuNumber(New List(Of Boolean) From {correctFormatting}, 4) & ". Reset Settings", "Restore the default state of the WinappDebug settings", menuItemLength)
+            printBlankMenuLine()
+            printMenuOpt(getMenuNumber({correctFormatting, correctFormatting, correctFormatting}, 4) & ". Reset Settings", "Restore the default state of the WinappDebug settings")
         End If
         printMenuLine(menuStr02)
     End Sub
 
     Sub main()
-        exitCode = False
-        menuTopper = "WinappDebug"
+        initMenu("WinappDebug", 35)
 
         Do While exitCode = False
             Console.Clear()
@@ -95,23 +103,22 @@ Module WinappDebug
                     Case input = "1" Or input = ""
                         initDebug()
                     Case input = "2"
-                        toggleSettingParam(correctFormatting, "Autocorrect ", menuTopper, settingsChanged)
+                        changeFileParams(winappFile, settingsChanged)
                     Case input = "3"
-                        changeFileParams(winappFile, menuTopper, settingsChanged, exitCode)
+                        toggleSettingParam(correctFormatting, "Autocorrect ", settingsChanged)
+
                     'If the input is 4, either want to change the save file or reset the settings, so select the first which is true
                     Case input = "4" And (correctFormatting Or settingsChanged)
 
-                        Select Case True
-                            Case correctFormatting
-                                changeFileParams(outputFile, menuTopper, settingsChanged, exitCode)
-                            Case settingsChanged
-                                resetSettings()
-                        End Select
+                        If correctFormatting Then
+                            changeFileParams(outputFile, settingsChanged)
+                        Else
+                            resetSettings()
+                        End If
 
-                    'If the input is 5, we want to reset the settings iff both correctformatting and settings changed are true
+                    'If the input is 5, we want to reset the settings iff both correctformatting and settingschanged are true
                     Case input = "5" And (correctFormatting And settingsChanged)
                         resetSettings()
-
                     Case Else
                         menuTopper = invInpStr
                 End Select
@@ -119,19 +126,20 @@ Module WinappDebug
                 exc(ex)
             End Try
         Loop
+        revertMenu()
     End Sub
 
     Private Function sortEntryNames(ByVal file As iniFile) As List(Of String)
         Dim entryList As List(Of String) = file.getSectionNamesAsList
         Dim sortedEntryList As List(Of String) = replaceAndSort(entryList, "-", "  ")
-        findOutOfPlace(entryList, sortedEntryList, "Entry", getLineNumsFromSections(file))
+        findOutOfPlace(entryList, sortedEntryList, "Entry", getLineNumsFromSections(file), False)
         Return entryList
     End Function
 
     Private Sub initDebug()
-        Dim winapp2 As iniFile = validate(winappFile, exitCode)
+        Dim winapp2 As iniFile = validate(winappFile)
         debug(winapp2)
-        revertMenu(exitCode)
+        revertMenu()
         If Not exitCode Then
             Console.Clear()
             menuTopper = "WinappDebug"
@@ -181,11 +189,11 @@ Module WinappDebug
         printMenuLine(menuStr03)
         printMenuLine(numErrs & " possible errors were detected.", "l")
         printMenuLine("Number of entries: " & cFile.sections.Count, "l")
-        printMenuLine(menuStr01)
+        printBlankMenuLine()
 
         're-write any changes we've made back to the file
         If correctFormatting Then
-            printMenuLine(menuStr01)
+            printBlankMenuLine()
             printMenuLine("Saving changes, do not close winapp2ool or data loss may occur...", "l")
 
             'rebuild our internal changes
@@ -204,7 +212,7 @@ Module WinappDebug
                 exc(ex)
             End Try
             printMenuLine("Finished saving changes.", "l")
-            printMenuLine(menuStr01)
+            printBlankMenuLine()
         End If
 
         printMenuLine("Press any key to return to the winapp2ool menu.", "l")
@@ -213,7 +221,7 @@ Module WinappDebug
     End Sub
 
 
-    Private Sub findOutOfPlace(ByRef someList As List(Of String), ByRef sortedList As List(Of String), ByVal findType As String, ByRef LineCountList As List(Of Integer))
+    Private Sub findOutOfPlace(ByRef someList As List(Of String), ByRef sortedList As List(Of String), ByVal findType As String, ByRef LineCountList As List(Of Integer), ByRef oopBool As Boolean)
 
         Dim originalPlacement As New List(Of String)
         originalPlacement.AddRange(someList.ToArray)
@@ -265,6 +273,7 @@ Module WinappDebug
             Dim sortpos As Integer = LineCountList(sortind)
 
             If findType <> "Entry" Then entry = findType & recind + 1 & "=" & entry
+            If Not oopBool Then oopBool = True
             cwl("Line: " & originalLines(recind) & " - Error: '" & findType & "' alphabetization. ")
             cwl(entry & " appears to be out of place.")
             cwl("Current Position: Line " & curpos)
@@ -302,8 +311,13 @@ Module WinappDebug
         'check for wholly duplicate commands 
         checkDupsAndNumbering(keyList, key, keyNumber, dupeList)
 
-        'make sure we don't have any dangly bits on the end of our key
-        If key.toString.Last = CChar(";") Then
+        If key.value.Contains(CChar("/")) Then
+            err(key.lineNumber, "Forward slash (/) detected in lieu of blackslash (\)", key.value)
+            If fixFormat(correctSlashes) Then key.value = key.value.Replace(CChar("/"), CChar("\"))
+        End If
+
+            'make sure we don't have any dangly bits on the end of our key
+            If key.toString.Last = CChar(";") Then
             err(key.lineNumber, "Trailing semicolon (;).", key.toString)
             key.value = key.value.TrimEnd(CChar(";"))
         End If
@@ -329,7 +343,7 @@ Module WinappDebug
                             casingerror = True
                             'if we have a casing error, fix it in memory and inform the user
                             err2(key.lineNumber, "Invalid CamelCasing on environment variable.", varcheck(1), var)
-                            key.value = key.value.Replace(varcheck(1), var)
+                            If fixFormat(correctCasing) Then key.value = key.value.Replace(varcheck(1), var)
                         End If
                     Next
 
@@ -359,8 +373,10 @@ Module WinappDebug
             For Each cmd In validCmds
                 If key.keyType.ToLower = cmd.ToLower Then
                     err2(key.lineNumber, "Command is formatted improperly.", key.keyType, cmd)
-                    key.name = key.name.Replace(key.keyType, cmd)
-                    key.keyType = cmd
+                    If fixFormat(correctCasing) Then
+                        key.name = key.name.Replace(key.keyType, cmd)
+                        key.keyType = cmd
+                    End If
                     Return True
                 End If
             Next
@@ -368,6 +384,10 @@ Module WinappDebug
             fullKeyErr(key, "Invalid command detected.")
             Return False
         End If
+    End Function
+
+    Private Function fixFormat(setting As Boolean) As Boolean
+        Return correctFormatting Or (correctSomeFormatting And setting)
     End Function
 
     Private Sub pLangSecRef(ByRef entry As winapp2entry)
@@ -422,7 +442,8 @@ Module WinappDebug
 
             'check for duplicate args
             For Each arg In keyParams.argsList
-                If argsStrings.Contains(arg) Or trimmedArgStrings.Contains(arg.ToLower) Then
+                If argsStrings.Contains(arg) Then
+                    'Or trimmedArgStrings.Contains(arg.ToLower) Then '    <--- "temporarily" disable this
                     err(key.lineNumber, "Duplicate FileKey parameter found", arg)
                     dupeArgs.Add(arg)
                 Else
@@ -450,7 +471,7 @@ Module WinappDebug
             For Each arg In dupeArgs
                 keyParams.argsList.Remove(arg)
             Next
-            keyParams.reconstructKey(key)
+            If fixFormat(correctParameters) Then keyParams.reconstructKey(key)
 
             'check the format of the filekey
             cFormat(key, curFileKeyNum, fileKeyStrings, dupeKeys)
@@ -471,11 +492,12 @@ Module WinappDebug
             'check for missing pipe symbol on recurse and removeself, fix them if detected
             If key.value.Contains("RECURSE") And Not key.value.Contains("|RECURSE") Then
                 fullKeyErr(key, "Missing pipe (|) before RECURSE.")
-                key.value = key.value.Replace("RECURSE", "|RECURSE")
+                If fixFormat(correctFlags) Then key.value = key.value.Replace("RECURSE", "|RECURSE")
             End If
             If key.value.Contains("REMOVESELF") And Not key.value.Contains("|REMOVESELF") Then
                 fullKeyErr(key, "Missing pipe (|) before REMOVESELF.")
-                key.value = key.value.Replace("REMOVESELF", "|REMOVESELF")
+
+                If fixFormat(correctFlags) Then key.value = key.value.Replace("REMOVESELF", "|REMOVESELF")
             End If
 
             'make sure VirtualStore folders point to the correct place
@@ -486,7 +508,8 @@ Module WinappDebug
             'backslash checks, fix if detected
             If key.value.Contains("%\|") Then
                 fullKeyErr(key, "Backslash (\) found before pipe (|).")
-                key.value = key.value.Replace("%\|", "%|")
+                If fixFormat(correctSlashes) Then key.value = key.value.Replace("%\|", "%|")
+
             End If
             If key.value.Contains("%") And Not key.value.Contains("%|") And Not key.value.Contains("%\") Then fullKeyErr(key, "Missing backslash (\) after %EnvironmentVariable%.")
         Next
@@ -512,13 +535,13 @@ Module WinappDebug
 
             If Not key.name = "Default" Then
                 fullKeyErr(key, "Unnecessary numbering detected")
-                key.name = "Default"
+                If fixFormat(correctNumbers) Then key.name = "Default"
             End If
 
             If Not key.value.ToLower.Equals("false") Then
                 fullKeyErr(key, "All entries should be disabled by default (Default=False).")
-                key.value = "False"
-            End If
+                    If fixFormat(correctDefaults) Then key.value = "False"
+                End If
         Next
     End Sub
 
@@ -639,11 +662,11 @@ Module WinappDebug
             cwl("No Default key found in " & entry.fullname)
 
             'We don't have a default key, so create one and insert it into the entry.
-            Dim defKey As New iniKey()
-            defKey.name = "Default"
-            defKey.value = "False"
-            entry.defaultKey.Add(defKey)
-            numErrs += 1
+            If fixFormat(correctDefaults) Then
+                entry.defaultKey.Add(New iniKey("Default=False", 0))
+                numErrs += 1
+            End If
+
         End If
 
     End Sub
@@ -669,7 +692,7 @@ Module WinappDebug
             'backslash check
             If key.value.Last = CChar("\") Then
                 fullKeyErr(key, "Trailing backslash (\) found in DetectFile")
-                key.value = key.value.TrimEnd(CChar("\"))
+                If fixFormat(correctSlashes) Then key.value = key.value.TrimEnd(CChar("\"))
             End If
 
             'check for nested wildcards
@@ -762,15 +785,20 @@ Module WinappDebug
         If keyList.Count > 0 Then
             Dim keyStrings As List(Of String) = getValuesFromKeyList(keyList)
             Dim sortedKeyList As List(Of String) = replaceAndSort(keyStrings, "|", " \ \")
-            findOutOfPlace(keyStrings, sortedKeyList, keyList(0).keyType, getLineNumsFromKeyList(keyList))
+            Dim anyOutOfPlace As Boolean = False
+            findOutOfPlace(keyStrings, sortedKeyList, keyList(0).keyType, getLineNumsFromKeyList(keyList), anyOutOfPlace)
 
             'rewrite the alphabetized keys back into the keylist
-            Dim i As Integer = 1
-            For Each key In keyList
-                key.name = key.keyType & i
-                key.value = keyStrings(i - 1)
-                i += 1
-            Next
+            If anyOutOfPlace Then
+                If fixFormat(correctAlpha) Then
+                    Dim i As Integer = 1
+                    For Each key In keyList
+                        key.name = key.keyType & i
+                        key.value = keyStrings(i - 1)
+                        i += 1
+                    Next
+                End If
+            End If
         End If
     End Sub
 
@@ -848,8 +876,10 @@ Module WinappDebug
                 Dim iteratorCheckerList() As String = Split(key.value, "|")
                 Dim endingslashchecker() As String = Split(key.value, "\|")
                 If Not endingslashchecker.Count = 2 Then fullKeyErr(key, "Missing backslash (\) before pipe (|) in ExcludeKey.")
+
             End If
         Next
+
 
         'Remove any duplicates
         removeDuplicateKeys(keyList, dupeKeys)

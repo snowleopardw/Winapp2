@@ -11,48 +11,48 @@ Module Winapp2ool
     Dim latestWa2Ver As String = ""
     Dim localWa2Ver As String = ""
 
+    Dim dnfOOD As Boolean = False
+
     'This boolean will prevent us from printing or asking for input under most circumstances, triggered by the -s command line argument 
     Public suppressOutput As Boolean = False
 
     Dim waUpdateIsAvail As Boolean = False
-    Dim menuTopper As String = ""
+
+    Private Sub printUpdNotif(updName As String, oldVer As String, newVer As String)
+        printBlankMenuLine()
+        printMenuLine("A new version of " & updName & "is available!", "c")
+        printMenuLine("Current:   v" & oldVer, "c")
+        printMenuLine("Available: v" & newVer, "c")
+    End Sub
 
     Private Sub printMenu()
         printMenuLine(tmenu(menuTopper))
         printMenuLine(menuStr03)
-        printMenuLine("Menu: Enter a number to select", "c")
-        If updateIsAvail Then
-            printMenuLine(menuStr01)
-            printMenuLine("A new version of Winapp2ool is available!", "c")
-            printMenuLine("Current:   v" & currentVersion, "c")
-            printMenuLine("Available: v" & latestVersion, "c")
-        End If
-        If waUpdateIsAvail And Not localWa2Ver = "0" Then
-            printMenuLine(menuStr01)
-            printMenuLine("A new version of winapp2.ini is available!", "c")
-            printMenuLine("Current:   v" & localWa2Ver, "c")
-            printMenuLine("Available: v" & latestWa2Ver, "c")
-        End If
-        printMenuLine(menuStr01)
-        printMenuLine("0. Exit             - Exit the application", "l")
-        printMenuLine("1. WinappDebug      - Check for and correct errors in winapp2.ini", "l")
-        printMenuLine("2. Trim             - Debloat winapp2.ini for your system", "l")
-        printMenuLine("3. Merge            - Merge the contents of an ini file into winapp2.ini", "l")
-        printMenuLine("4. Diff             - Observe the changes between two winapp2.ini files", "l")
-        printMenuLine("5. CCiniDebug       - Sort and trim ccleaner.ini", "l")
-        printMenuLine(menuStr01)
-        printMenuLine("6. Downloader       - Download files from the Winapp2 GitHub", "l")
+        If dnfOOD Then printMenuLine("Your .NET Framework is out of date. Please update to version 4.6+.", "c")
+        If updateIsAvail Then printUpdNotif("Winapp2ool ", currentVersion.ToString, latestVersion)
+        If waUpdateIsAvail And Not localWa2Ver = "0" Then printUpdNotif("winapp2.ini ", localWa2Ver, latestWa2Ver)
+        printMenuLine(menuStr04)
+        printMenuOpt("0. Exit", "Exit the application")
+        printMenuOpt("1. WinappDebug", "Check for and correct errors in winapp2.ini")
+        printMenuOpt("2. Trim", "Debloat winapp2.ini for your system")
+        printMenuOpt("3. Merge", "Merge the contents of an ini file into winapp2.ini")
+        printMenuOpt("4. Diff", "Observe the changes between two winapp2.ini files")
+        printMenuOpt("5. CCiniDebug", "Sort and trim ccleaner.ini")
+        printBlankMenuLine()
+        printMenuOpt("6. Downloader", "Download files from the Winapp2 GitHub")
         printMenuLine(menuStr02)
     End Sub
 
     Public Sub main()
-        menuTopper = "Winapp2ool - A multitool for winapp2.ini and related files"
+
         Console.Title = "Winapp2ool v" & currentVersion & " beta"
         Console.WindowWidth = 120
+        initMenu("Winapp2ool - A multitool for winapp2.ini and related files", 35)
         processCommandLineArgs()
+
         If suppressOutput Then Environment.Exit(1)
+
         checkUpdates()
-        Dim exitCode As Boolean = False
         Do Until exitCode = True
             Console.Clear()
             printMenu()
@@ -94,6 +94,7 @@ Module Winapp2ool
             'Check for winapp2ool.exe updates
             latestVersion = getRemoteFileDataAtLineNum(toolVerLink, 1)
             updateIsAvail = CDbl(latestVersion) > currentVersion
+            If Not Environment.Version.ToString = "4.0.30319.42000" Then dnfOOD = True
 
             'Check for winapp2.ini updates
             latestWa2Ver = getRemoteFileDataAtLineNum(wa2Link, 1).Split(CChar(" "))(2)
@@ -111,9 +112,18 @@ Module Winapp2ool
     End Sub
 
     Public Sub exc(ByRef ex As Exception)
-        cwl("Error: " & ex.ToString)
-        cwl("Please report this error on GitHub")
-        cwl()
+        If ex.Message.ToString.Contains("SSL/TLS") Then
+            cwl("Error: download could not be completed.")
+            cwl("This issue is caused by an out of date .NET Framework.")
+            cwl("Please update .NET Framework to version 4.6 or higher and try again.")
+            cwl("If the issue persists after updating .NET Framework, please report this error on GitHub.")
+        Else
+            cwl("Error: " & ex.ToString)
+            cwl("Please report this error on GitHub")
+            cwl()
+        End If
+
+
     End Sub
 
     Public Sub cwl()
@@ -125,24 +135,17 @@ Module Winapp2ool
     End Sub
 
     'Prompt the user to change a file's parameters, flag it as changed, and mark settings as having changed
-    Public Sub changeFileParams(ByRef someFile As IFileHandlr, menuTopper As String, ByRef settingsChangedSetting As Boolean, ByRef ec As Boolean)
-        fChooser(someFile.dir, someFile.name, ec, someFile.initName, someFile.secondName)
+    Public Sub changeFileParams(ByRef someFile As IFileHandlr, ByRef settingsChangedSetting As Boolean)
+        fChooser(someFile.dir, someFile.name, someFile.initName, someFile.secondName)
         settingsChangedSetting = True
-        menuTopper = If(someFile.secondName <> "", someFile.initName, "save file") & " parameters updated"
+        menuTopper = If(someFile.secondName = "", someFile.initName, "save file") & " parameters updated"
     End Sub
 
     'Toggle a parameter on or off and mark settings as having changed
-    Public Sub toggleSettingParam(ByRef setting As Boolean, paramText As String, ByRef topper As String, ByRef settingsChangedSetting As Boolean)
+    Public Sub toggleSettingParam(ByRef setting As Boolean, paramText As String, ByRef settingsChangedSetting As Boolean)
         setting = Not setting
-        topper = paramText & If(setting, "enabled", "disabled")
+        menuTopper = paramText & If(setting, "enabled", "disabled")
         settingsChangedSetting = True
     End Sub
-
-    Public Function getMenuNumber(valList As List(Of Boolean), lowestStartingNum As Integer) As Integer
-        For Each setting In valList
-            If setting Then lowestStartingNum += 1
-        Next
-        Return lowestStartingNum
-    End Function
 
 End Module

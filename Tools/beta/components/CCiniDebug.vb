@@ -11,15 +11,12 @@ Module CCiniDebug
     Dim ccini As iniFile
 
     'Menu vars
-    Dim exitCode As Boolean
-    Dim menuTopper As String = ""
-    Dim menuItemLength As Integer = 35
+    Dim settingsChanged As Boolean = False
 
     'Boolean module parameters
     Dim pruneFile As Boolean = True
     Dim saveFile As Boolean = True
     Dim sortFile As Boolean = True
-    Dim settingsChanged As Boolean = False
 
     'Restore the default state of the module parameters
     Private Sub initDefaultSettings()
@@ -55,32 +52,27 @@ Module CCiniDebug
     End Sub
 
     Private Sub printMenu()
-        printMenuLine(tmenu(menuTopper))
-        printMenuLine(menuStr03)
-        printMenuLine("This tool will sort alphabetically the contents of ccleaner.ini", "c")
-        printMenuLine("and can also prune stale winapp2.ini entries from it", "c")
-        printMenuLine(menuStr04)
-        printMenuLine("0. Exit", "Return to the winapp2ool menu", menuItemLength)
-        printMenuLine("1. Run (default)", "Debug ccleaner.ini", menuItemLength)
-        printMenuLine(menuStr01)
-        printMenuLine("2. Toggle Pruning", If(pruneFile, "Disable", "Enable") & " removal of dead winapp2.ini settings", menuItemLength)
-        printMenuLine("3. Toggle Saving", If(saveFile, "Disable", "Enable") & " automatic saving of changes made by CCiniDebug", menuItemLength)
-        printMenuLine("4. Toggle Sorting", If(sortFile, "Disable", "Enable") & " alphabetical sorting of ccleaner.ini", menuItemLength)
-        printMenuLine(menuStr01)
-        printMenuLine("5. File Chooser (ccleaner.ini)", "Choose a new ccleaner.ini name or location", menuItemLength)
+        printMenuTop({"Sort alphabetically the contents of ccleaner.ini and prune stale winapp2.ini settings"})
+        printMenuOpt("1. Run (default)", "Debug ccleaner.ini")
+        printBlankMenuLine()
+        printMenuOpt("2. Toggle Pruning", If(pruneFile, "Disable", "Enable") & " removal of dead winapp2.ini settings")
+        printMenuOpt("3. Toggle Saving", If(saveFile, "Disable", "Enable") & " automatic saving of changes made by CCiniDebug")
+        printMenuOpt("4. Toggle Sorting", If(sortFile, "Disable", "Enable") & " alphabetical sorting of ccleaner.ini")
+        printBlankMenuLine()
+        printMenuOpt("5. File Chooser (ccleaner.ini)", "Choose a new ccleaner.ini name or location")
 
-        If pruneFile Then printMenuLine("6. File Chooser (winapp2.ini)", "Choose a new winapp2.ini name or location", menuItemLength)
+        If pruneFile Then printMenuOpt("6. File Chooser (winapp2.ini)", "Choose a new winapp2.ini name or location")
 
-        If saveFile Then printMenuLine(getMenuNumber(New List(Of Boolean) From {pruneFile}, 6) & ". File Chooser (save)", "Change where CCiniDebug saves its changes", menuItemLength)
+        If saveFile Then printMenuOpt(getMenuNumber({pruneFile}, 6) & ". File Chooser (save)", "Change where CCiniDebug saves its changes")
 
-        printMenuLine(menuStr01)
+        printBlankMenuLine()
         printMenuLine("Current ccleaner.ini:  " & replDir(ccFile.path), "l")
         If pruneFile Then printMenuLine("Current winapp2.ini:   " & replDir(winappFile.path), "l")
         If saveFile Then printMenuLine("Current save location: " & replDir(outputFile.path), "l")
 
         If settingsChanged Then
-            printMenuLine(menuStr01)
-            printMenuLine(getMenuNumber(New List(Of Boolean) From {pruneFile, saveFile}, 6) & ". Reset Settings", "Restore the default state of the CCiniDebug settings", menuItemLength)
+            printBlankMenuLine()
+            printMenuOpt(getMenuNumber({pruneFile, saveFile}, 6) & ". Reset Settings", "Restore the default state of the CCiniDebug settings")
         End If
 
         printMenuLine(menuStr02)
@@ -92,8 +84,7 @@ Module CCiniDebug
     End Sub
 
     Public Sub Main()
-        exitCode = False
-        menuTopper = "CCiniDebug"
+        initMenu("CCiniDebug", 35)
         Do Until exitCode
             Console.Clear()
             printMenu()
@@ -102,7 +93,7 @@ Module CCiniDebug
             Dim input As String = Console.ReadLine
 
             Try
-                Dim menuNum As Integer = getMenuNumber(New List(Of Boolean) From {pruneFile, saveFile, sortFile, settingsChanged}, 4)
+                Dim menuNum As Integer = getMenuNumber({pruneFile, saveFile, sortFile, settingsChanged}, 4)
 
                 Select Case True
                     Case input = "0"
@@ -111,22 +102,22 @@ Module CCiniDebug
                     Case input = "1" Or input = ""
                         initDebug()
                     Case input = "2"
-                        toggleSettingParam(pruneFile, "Pruning ", menuTopper, settingsChanged)
+                        toggleSettingParam(pruneFile, "Pruning ", settingsChanged)
                     Case input = "3"
-                        toggleSettingParam(saveFile, "Autosaving ", menuTopper, settingsChanged)
+                        toggleSettingParam(saveFile, "Autosaving ", settingsChanged)
                     Case input = "4"
-                        toggleSettingParam(sortFile, "Sorting ", menuTopper, settingsChanged)
+                        toggleSettingParam(sortFile, "Sorting ", settingsChanged)
                     Case input = "5"
-                        changeFileParams(ccFile, menuTopper, settingsChanged, exitCode)
+                        changeFileParams(ccFile, settingsChanged)
 
                     'When the input is 6, only one of the three possible settings is true, so select the first
-                    Case input = "6" And menuNum >= 6
+                    Case input = "6" And menuNum >= 5
 
                         Select Case True
                             Case pruneFile
-                                changeFileParams(winappFile, menuTopper, settingsChanged, exitCode)
+                                changeFileParams(winappFile, settingsChanged)
                             Case saveFile
-                                changeFileParams(outputFile, menuTopper, settingsChanged, exitCode)
+                                changeFileParams(outputFile, settingsChanged)
                             Case settingsChanged
                                 resetSettings()
                             Case Else
@@ -138,7 +129,7 @@ Module CCiniDebug
 
                         Select Case True
                             Case pruneFile And saveFile
-                                changeFileParams(outputFile, menuTopper, settingsChanged, exitCode)
+                                changeFileParams(outputFile, settingsChanged)
                             Case settingsChanged And (Not pruneFile Or Not saveFile)
                                 resetSettings()
                             Case Else
@@ -156,19 +147,20 @@ Module CCiniDebug
                 exc(ex)
             End Try
         Loop
+        revertMenu()
     End Sub
 
     Private Sub initDebug()
         Console.Clear()
 
         'Load our inifiles into memory and execute the debugging steps
-        ccini = validate(ccFile, exitCode)
+        ccini = validate(ccFile)
         If exitCode Then Exit Sub
         Console.Clear()
 
         'Load winapp2.ini and use it to prune ccleaner.ini of stale entries
         If pruneFile Then
-            winappini = validate(winappFile, exitCode)
+            winappini = validate(winappFile)
             If exitCode Then Exit Sub
             Console.Clear()
 
@@ -201,12 +193,12 @@ Module CCiniDebug
         If Not suppressOutput Then Console.ReadKey()
 
         'Flip the exitCode boolean
-        revertMenu(exitCode)
+        revertMenu()
     End Sub
 
     Private Sub prune(ByRef optionsSec As iniSection)
         printMenuLine("Scanning " & ccFile.name & " for settings left over from removed winapp2.ini entries", "l")
-        printMenuLine(menuStr01)
+        printBlankMenuLine()
 
         'collect the keys we must remove
         Dim tbTrimmed As New List(Of Integer)
@@ -226,7 +218,7 @@ Module CCiniDebug
             End If
         Next
 
-        printMenuLine(menuStr01)
+        printBlankMenuLine()
         printMenuLine(tbTrimmed.Count & " orphaned settings detected", "l")
 
         'Remove the keys

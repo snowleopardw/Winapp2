@@ -12,12 +12,9 @@ Public Module Trim
                            "%ProgramFiles%\Chromium\chrome.exe", "%ProgramFiles%\Flock\Application\flock.exe", "%ProgramFiles%\Google\Chrome SxS\Application\chrome.exe", "%ProgramFiles%\Google\Chrome\Application\chrome.exe", "%ProgramFiles%\RockMelt\Application\rockmelt.exe",
                            "HKCU\Software\Chromium", "HKCU\Software\SuperBird", "HKCU\Software\Torch", "HKCU\Software\Vivaldi"}
 
-    Dim exitCode As Boolean = False
     Dim settingsChanged As Boolean
-    Dim menuTopper As String
     Dim download As Boolean = False
     Dim downloadNCC As Boolean = False
-    Dim menuItemLength As Integer = 35
 
     'Restore the default state of the module parameters
     Private Sub initDefaultSettings()
@@ -52,20 +49,15 @@ Public Module Trim
     End Sub
 
     Private Sub printmenu()
-        printMenuLine(tmenu(menuTopper))
-        printMenuLine(menuStr03)
-        printMenuLine("This tool will trim winapp2.ini such that it contains only entries relevant to your machine,", "c")
-        printMenuLine("greatly reducing both application load time and the winapp2.ini file size.", "c")
-        printMenuLine(menuStr04)
-        printMenuLine("0. Exit", "Return to the winapp2ool menu", menuItemLength)
-        printMenuLine("1. Run (default)", "Trim a local winapp2.ini", menuItemLength)
-        printMenuLine(menuStr01)
-        printMenuLine("2. Toggle Download", If(download, "Disable", "Enable") & " using the latest winapp2.ini as the input file", menuItemLength)
-        printMenuLine("3. Toggle Download (Non-CCleaner)", If(downloadNCC, "Disable", "Enable") & " using the latest Non-CCleaner winapp2.ini as the input file", menuItemLength)
-        printMenuLine(menuStr01)
-        printMenuLine("4. File Chooser (winapp2.ini)", "Change the winapp2.ini name or location", menuItemLength)
-        printMenuLine("5. File Chooser (save)", "Change the save file name or location", menuItemLength)
-        printMenuLine(menuStr01)
+        printMenuTop({"Trim winapp2.ini such that it contains only entries relevant to your machine,", "greatly reducing both application load time and the winapp2.ini file size."})
+        printMenuOpt("1. Run (default)", "Trim a local winapp2.ini")
+        printBlankMenuLine()
+        printMenuOpt("2. Toggle Download", If(download, "Disable", "Enable") & " using the latest winapp2.ini as the input file")
+        printMenuOpt("3. Toggle Download (Non-CCleaner)", If(downloadNCC, "Disable", "Enable") & " using the latest Non-CCleaner winapp2.ini as the input file")
+        printBlankMenuLine()
+        printMenuOpt("4. File Chooser (winapp2.ini)", "Change the winapp2.ini name or location")
+        printMenuOpt("5. File Chooser (save)", "Change the save file name or location")
+        printBlankMenuLine()
 
         If download Then
             printMenuLine("Current winapp2.ini location: " & If(downloadNCC, "Online (Non-CCleaner)", "Online"), "l")
@@ -75,16 +67,14 @@ Public Module Trim
 
         printMenuLine("Current save location: " & replDir(outputFile.path), "l")
         If settingsChanged Then
-            printMenuLine(menuStr01)
-            printMenuLine("6. Reset Settings", "Reset the Trim settings to their defaults", menuItemLength)
+            printBlankMenuLine()
+            printMenuOpt("6. Reset Settings", "Reset the Trim settings to their defaults")
         End If
         printMenuLine(menuStr02)
     End Sub
 
     Public Sub main()
-        exitCode = False
-        menuTopper = "Trim"
-
+        initMenu("Trim", 35)
         Dim input As String
         Do Until exitCode
             Console.Clear()
@@ -100,18 +90,18 @@ Public Module Trim
                 Case "1", ""
                     initTrim()
                 Case "2"
-                    toggleSettingParam(download, "Downloading ", menuTopper, settingsChanged)
+                    toggleSettingParam(download, "Downloading ", settingsChanged)
                     If (Not download) And downloadNCC Then
-                        toggleSettingParam(downloadNCC, "Downloading ", menuTopper, settingsChanged)
+                        toggleSettingParam(downloadNCC, "Downloading ", settingsChanged)
                     End If
 
                 Case "3"
-                    If Not download Then toggleSettingParam(download, "Downloading ", menuTopper, settingsChanged)
-                    toggleSettingParam(downloadNCC, "Downloading ", menuTopper, settingsChanged)
+                    If Not download Then toggleSettingParam(download, "Downloading ", settingsChanged)
+                    toggleSettingParam(downloadNCC, "Downloading ", settingsChanged)
                 Case "4"
-                    changeFileParams(winappFile, menuTopper, settingsChanged, exitCode)
+                    changeFileParams(winappFile, settingsChanged)
                 Case "5"
-                    changeFileParams(outputFile, menuTopper, settingsChanged, exitCode)
+                    changeFileParams(outputFile, settingsChanged)
                 Case "6"
                     If settingsChanged Then
                         resetSettings()
@@ -122,12 +112,13 @@ Public Module Trim
                     menuTopper = invInpStr
             End Select
         Loop
+        revertMenu()
     End Sub
 
     Private Sub initTrim()
         'Validate winapp2.ini's existence, load it as an inifile and convert it to a winapp2file before passing it to trim
         If Not download Then
-            Dim winapp2file As iniFile = validate(winappFile, exitCode)
+            Dim winapp2file As iniFile = validate(winappFile)
             If exitCode Then Exit Sub
             Dim winapp2 As New winapp2file(winapp2file)
             trim(winapp2)
@@ -135,14 +126,14 @@ Public Module Trim
             Dim link As String = If(downloadNCC, nonccLink, wa2Link)
             initDownloadedTrim(link, "\winapp2.ini")
         End If
-        revertMenu(exitCode)
+        revertMenu()
         Console.Clear()
     End Sub
 
     Public Sub initDownloadedTrim(link As String, name As String)
         'Grab a remote ini file and toss it into the trimmer
         trim(New winapp2file(getRemoteIniFile(link, name)))
-        revertMenu(exitCode)
+        revertMenu()
     End Sub
 
     Private Sub trim(winapp2 As winapp2file)
@@ -172,7 +163,7 @@ Public Module Trim
         printMenuLine(menuStr03)
         printMenuLine("Number of entries before trimming: " & entryCountBeforeTrim, "l")
         printMenuLine("Number of entries after trimming: " & winapp2.count, "l")
-        printMenuLine(menuStr01)
+        printBlankMenuLine()
         printMenuLine("Press any key to return to the winapp2ool menu", "l")
         printMenuLine(menuStr02)
 

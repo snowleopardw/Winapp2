@@ -5,22 +5,19 @@ Module Diff
 
     'File handlers
     Dim oFile As IFileHandlr = New IFileHandlr(Environment.CurrentDirectory, "winapp2.ini")
-    Dim nFile As IFileHandlr = New IFileHandlr(Environment.CurrentDirectory, "")
+    Dim nFile As IFileHandlr = New IFileHandlr(Environment.CurrentDirectory, "winapp2.ini", "")
     Dim logFile As IFileHandlr = New IFileHandlr(Environment.CurrentDirectory, "diff.txt")
     Dim oldFile As iniFile
     Dim newFile As iniFile
     Dim outputToFile As String
 
     'Menu settings
-    Dim menuTopper As String = ""
-    Dim menuItemLength As Integer = 35
+    Dim settingsChanged As Boolean = False
 
     'Boolean module parameters
-    Dim exitCode As Boolean = False
     Dim downloadFile As Boolean = False
     Dim downloadNCC As Boolean = False
     Dim saveLog As Boolean = False
-    Dim settingsChanged As Boolean = False
 
     'Return the default parameters to the commandline handler
     Public Sub initDiffParams(ByRef firstFile As IFileHandlr, ByRef secondFile As IFileHandlr, ByRef thirdFile As IFileHandlr, ByRef d As Boolean, ByRef dncc As Boolean, ByRef sl As Boolean)
@@ -55,38 +52,42 @@ Module Diff
         settingsChanged = False
     End Sub
 
+    Private Sub resetSettings()
+        initDefaultSettings()
+        menuTopper = "Diff settings have been reset to their defaults"
+    End Sub
+
     Private Sub printMenu()
-        printMenuLine(tmenu(menuTopper))
-        printMenuLine(menuStr03)
-        printMenuLine("This tool will output the diff between two winapp2 files", "c")
-        printMenuLine(menuStr01)
-        printMenuLine("Menu: Enter a number to select", "c")
-        printMenuLine(menuStr01)
-        printMenuLine("0. Exit                        - Return to the winapp2ool menu", "l")
-        printMenuLine("1. Run (default)               - Run the diff tool", "l")
-        printMenuLine("2. Run (online)                - Diff your local winapp2.ini against the latest", "l")
-        printMenuLine("3. Run (online non ccleaner)   - Diff your local non-ccleaner winapp2.ini against the latest", "l")
-        printMenuLine(menuStr01)
-        printMenuLine("4. Toggle Log Saving           - " & If(saveLog, "Disable", "Enable") & " automatic saving of the Diff output", "l")
+        printMenuTop({"Observe the differences between two ini files"})
+        printMenuOpt("1. Run (default)", "Run the diff tool")
+        printBlankMenuLine()
+        printMenuLine("Select Older/Local File:", "l")
+        printMenuLine("2. Winapp2.ini", "l")
+        printMenuOpt("3. File Chooser (older file)", "Choose a new name or location for your older ini file")
+        printBlankMenuLine()
+        printMenuLine("Select Newer/Remote File:", "l")
+        printMenuOpt("4. winapp2.ini (online)", "Diff against the latest winapp2.ini version on GitHub")
+        printMenuOpt("5. winapp2.ini (non-ccleaner)", "Diff against the latest non-ccleaner winapp2.ini version on GitHub")
+        printMenuOpt("6. File Chooser (newer file)", "Choose a new name of location for your newer ini file")
+        printBlankMenuLine()
+        printMenuLine("Log Settings:", "l")
+        printMenuOpt("7. Toggle Log Saving", If(saveLog, "Disable", "Enable") & " automatic saving of the Diff output")
+        If saveLog Then printMenuOpt("8. File Chooser (log)", "Change where Diff saves its log")
 
-        If saveLog Then
-            printMenuLine(menuStr01)
-            printMenuLine("5. File Chooser (log)          - Change where Diff saves its log", "l")
-        End If
-
-        printMenuLine(menuStr01)
+        printBlankMenuLine()
         printMenuLine("Older file: " & replDir(oFile.path), "l")
-        If nFile.name <> "" Then printMenuLine("Newer file: " & replDir(nFile.path), "l")
+
+        printMenuLine("Newer file: " & If(nFile.name = "", "Not yet selected", replDir(nFile.path)), "l")
         If settingsChanged Then
-            printMenuLine(menuStr01)
-            printMenuLine(If(saveLog, "6.", "5.") & " Reset Settings              - Restore the default state of the Diff settings", "l")
+            printBlankMenuLine()
+            printMenuOpt(getMenuNumber({saveLog}, 8) & ". Reset Settings", "Restore the default state of the Diff settings")
         End If
         printMenuLine(menuStr02)
     End Sub
 
     Public Sub main()
-        menuTopper = "Diff"
-        exitCode = False
+        initMenu("Diff", 35)
+        Console.WindowHeight = 40
         outputToFile = ""
 
         Do Until exitCode
@@ -97,22 +98,44 @@ Module Diff
 
             Dim input As String = Console.ReadLine()
             Try
-                Select Case input
-                    Case "0"
+                Select Case True
+                    Case input = "0"
                         Console.WriteLine("Exiting diff...")
                         exitCode = True
-                    Case "1", ""
+                    Case input = "1" Or input = ""
                         initDiff()
-                    Case "2"
-                        downloadFile = True
-                        downloadNCC = False
-                        initDiff()
-                    Case "3"
-                        downloadFile = True
-                        downloadNCC = True
-                        initDiff()
-                    Case "4"
-                        toggleSettingParam(saveLog, "Logging ", menuTopper, settingsChanged)
+                    Case input = "2"
+                        oFile.name = "winapp2.ini"
+                    Case input = "3"
+                        changeFileParams(oFile, settingsChanged)
+                        If exitCode Then revertMenu()
+                    Case input = "4"
+                        toggleSettingParam(downloadFile, "Download ", settingsChanged)
+                        nFile.name = "Online"
+                    Case input = "5"
+
+                        Select Case True
+                            Case (Not downloadFile And Not downloadNCC) Or (downloadFile And downloadNCC)
+                                toggleSettingParam(downloadFile, "Download ", settingsChanged)
+                                toggleSettingParam(downloadNCC, "Download Non-CCleaner ", settingsChanged)
+                            Case downloadFile And Not downloadNCC
+                                toggleSettingParam(downloadNCC, "Download Non-CCleaner ", settingsChanged)
+                        End Select
+
+                        nFile.name = If(downloadNCC, "Online (non-ccleaner)", "")
+                    Case input = "6"
+                        changeFileParams(nFile, settingsChanged)
+                        If exitCode Then revertMenu()
+                    Case input = "7"
+                        toggleSettingParam(saveLog, "Log Saving ", settingsChanged)
+                    Case input = "8" And (saveLog Or settingsChanged)
+                        If saveLog Then
+                            changeFileParams(logFile, settingsChanged)
+                        Else
+                            resetSettings()
+                        End If
+                    Case input = "9" And (settingsChanged And saveLog)
+                        resetSettings()
                     Case Else
                         menuTopper = invInpStr
                 End Select
@@ -120,57 +143,17 @@ Module Diff
                 exc(ex)
             End Try
         Loop
+        revertMenu()
+        Console.WindowHeight = 30
     End Sub
 
     Private Sub initDiff()
-        loadFiles()
+        oldFile = validate(oFile)
+        If downloadFile Then newFile = getRemoteWinapp(downloadNCC)
         differ()
         If saveLog Then saveDiff()
-        revertMenu(exitCode)
+        revertMenu()
         Console.Clear()
-    End Sub
-
-    'Print out the menu for selecting the files to diff
-    Private Function printFileLoader(ageType As String, ByRef someFile As IFileHandlr) As iniFile
-        printMenuLine(tmenu("Diff file Loader"))
-        printMenuLine(menuStr03)
-        printMenuLine("Options", "c")
-        printMenuLine("Enter the name of the " & ageType & " file", "l")
-        printMenuLine("Enter '0' to return to the menu", "l")
-        printMenuLine("Enter '1' to open the file/directory chooser", "l")
-        printMenuLine("Leave blank to use the default (winapp2.ini)", "l")
-        printMenuLine(menuStr02)
-        Console.WriteLine()
-        Dim input As String = Console.ReadLine()
-        Select Case input
-            Case ""
-                someFile.name = "winapp2.ini"
-            Case "0"
-                exitCode = True
-                Return Nothing
-            Case "1"
-                fChooser(someFile.dir, someFile.name, exitCode, "winapp2.ini", "")
-            Case Else
-                someFile.name = input
-        End Select
-
-        Return validate(someFile, exitCode)
-    End Function
-
-    'load up the files to diff
-    Private Sub loadFiles()
-        Console.Clear()
-        Try
-            'Always collect the older file
-            oldFile = printFileLoader("older", oFile)
-            If exitCode Then Exit Sub
-
-            'Collect the second file conditionally based on whether its a download or a local file
-            newFile = If(downloadFile, getRemoteWinapp(downloadNCC), printFileLoader("newer", nFile))
-            If exitCode Then Exit Sub
-        Catch ex As Exception
-            exc(ex)
-        End Try
     End Sub
 
     Private Sub differ()
@@ -179,10 +162,10 @@ Module Diff
         Try
             'collect & verify version #s and print them out for the menu
             Dim fver As String = oldFile.comments(0).comment.ToString
-            fver = IIf(fver.ToLower.Contains("version"), fver.TrimStart(CChar(";")).Replace("Version:", "version"), " version not given").ToString
+            fver = If(fver.ToLower.Contains("version"), fver.TrimStart(CChar(";")).Replace("Version:", "version"), " version not given")
 
             Dim sver As String = newFile.comments(0).comment.ToString
-            sver = IIf(sver.ToLower.Contains("version"), sver.TrimStart(CChar(";")).Replace("Version:", "version"), " version not given").ToString
+            sver = If(sver.ToLower.Contains("version"), sver.TrimStart(CChar(";")).Replace("Version:", "version"), " version not given")
 
             outputToFile += tmenu("Changes made between" & fver & " and" & sver) & Environment.NewLine
             outputToFile += menu(menuStr02) & Environment.NewLine
@@ -230,16 +213,44 @@ Module Diff
 
     Private Function compareTo() As List(Of String)
 
-        Dim outList As New List(Of String)
-        Dim comparedList As New List(Of String)
+        Dim outList, comparedList As New List(Of String)
 
         For Each section In oldFile.sections.Values
             Try
+
                 'If we're looking at an entry in the old file and the new file contains it, and we haven't yet processed this entry
                 If newFile.sections.Keys.Contains(section.name) And Not comparedList.Contains(section.name) Then
                     Dim sSection As iniSection = newFile.sections(section.name)
+
                     'and if that entry in the new file does not compareTo the entry in the old file, we have a modified entry
-                    If Not section.compareTo(sSection) Then outList.Add(getDiff(sSection, "modified."))
+                    Dim addedKeys, removedKeys As New List(Of iniKey)
+                    Dim updatedKeys As New List(Of KeyValuePair(Of iniKey, iniKey))
+                    If Not section.compareTo(sSection, removedKeys, addedKeys, updatedKeys) Then
+                        Dim tmp As String = getDiff(sSection, "modified.")
+                        If addedKeys.Count > 0 Then
+                            tmp += Environment.NewLine & "Added:"
+                            For Each key In addedKeys
+                                tmp += Environment.NewLine & key.toString
+                            Next
+                        End If
+                        If removedKeys.Count > 0 Then
+                            tmp += Environment.NewLine & Environment.NewLine & "Removed:"
+                            For Each key In removedKeys
+                                tmp += Environment.NewLine & key.toString
+                            Next
+                        End If
+                        If updatedKeys.Count > 0 Then
+                            tmp += If(removedKeys.Count > 0 Or addedKeys.Count > 0, Environment.NewLine & Environment.NewLine, Environment.NewLine) & "Modified:" & Environment.NewLine
+                            For Each pair In updatedKeys
+                                tmp += Environment.NewLine & pair.Key.name & Environment.NewLine
+
+                                tmp += "old:   " & pair.Key.toString & Environment.NewLine
+                                tmp += "new:   " & pair.Value.toString & Environment.NewLine
+                            Next
+                        End If
+                        tmp += Environment.NewLine & Environment.NewLine & menuStr00
+                        outList.Add(tmp)
+                    End If
 
                 ElseIf Not newFile.sections.Keys.Contains(section.name) And Not comparedList.Contains(section.name) Then
                     'If we do not have the entry in the new file, it has been removed between versions 
@@ -265,7 +276,7 @@ Module Diff
         out += mkMenuLine(section.name & " has been " & changeType, "c") & Environment.NewLine
         out += mkMenuLine(menuStr02, "") & Environment.NewLine & Environment.NewLine
         out += section.ToString & Environment.NewLine
-        out += menuStr00
+        If Not changeType = "modified." Then out += menuStr00
         Return out
     End Function
 
